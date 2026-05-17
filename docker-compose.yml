@@ -1,0 +1,13 @@
+version: '3.8'
+
+services:
+  ddos-detector:
+    build: .
+    container_name: ddos-detector
+    volumes:
+      - ./ddos-data-2024:/app/ddos-data-2024
+      - ./models:/app/models
+      - ./outputs:/app/outputs
+    environment:
+      - PYTHONUNBUFFERED=1
+    working_dir: /app
