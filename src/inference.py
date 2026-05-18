@@ -10,11 +10,19 @@ import numpy as np
 import pandas as pd
 import joblib
 
-from utils import setup_logging, get_project_paths, load_multiple_datasets, load_config
-from preprocess import engineer_features, load_preprocessor, to_dense
-from evaluate import evaluate_model, save_predictions, print_metrics_report
+from src.utils import setup_logging, get_project_paths, load_multiple_datasets, load_config
+from src.preprocess import engineer_features, load_preprocessor, to_dense
+from src.evaluate import evaluate_model, save_predictions, print_metrics_report
 
 logger = logging.getLogger("ddos_detection")
+
+LEAKAGE_COLS = [
+    "attack_id",
+    "victim_ip",
+    "card",
+    "significant_flag",
+    "whitelist_flag",
+]
 
 
 def load_model_artifacts(model_dir: Path) -> Tuple[object, object, dict]:
@@ -85,6 +93,7 @@ def run_inference(
     preprocessor,
     config: dict,
     target_col: str = "type",
+    leakage_cols: list = None,
 ) -> Dict[str, np.ndarray]:
     """
     Run inference on input data.
@@ -102,7 +111,12 @@ def run_inference(
     logger.info(f"Running inference on {len(df)} samples...")
 
     # Preprocess
-    X_processed = preprocess_for_inference(df, preprocessor, target_col=target_col)
+    X_processed = preprocess_for_inference(
+        df,
+        preprocessor,
+        target_col=target_col,
+        leakage_cols=leakage_cols,
+    )
 
     # Predict
     y_pred = model.predict(X_processed)
@@ -162,6 +176,7 @@ def main(
         preprocessor,
         config,
         target_col="type" if use_labels else None,
+        leakage_cols=LEAKAGE_COLS,
     )
 
     # Save predictions

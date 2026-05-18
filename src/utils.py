@@ -71,28 +71,117 @@ def ensure_output_dir() -> Path:
 
 
 # Dataset loading
+EVENT_SUFFIX = "_events.csv"
+COMPONENT_SUFFIX = "_components.csv"
+
+
+def _normalize_column_name(column: str) -> str:
+    """Normalize raw dataset column names to snake_case."""
+    rename_map = {
+        "Attack ID": "attack_id",
+        "Card": "card",
+        "Victim IP": "victim_ip",
+        "Port number": "port_number",
+        "Attack code": "attack_code",
+        "Detect count": "detect_count",
+        "Significant flag": "significant_flag",
+        "Packet speed": "packet_speed",
+        "Data speed": "data_speed",
+        "Avg packet len": "avg_packet_len",
+        "Avg source IP count": "avg_source_ip_count",
+        "Source IP count": "source_ip_count",
+        "Start time": "start_time",
+        "End time": "end_time",
+        "Whitelist flag": "whitelist_flag",
+        "Type": "type",
+        "Time": "time",
+    }
+
+    column = column.strip()
+    column = rename_map.get(column, column)
+    column = column.lower().strip()
+    column = column.replace(" ", "_").replace("-", "_")
+    return column
+
+
+def normalize_columns(df: pd.DataFrame) -> pd.DataFrame:
+    """Normalize dataset column names and remove leading/trailing whitespace."""
+    df = df.copy()
+    df.columns = [_normalize_column_name(col) for col in df.columns]
+    return df
+
+
+def _aggregate_component_features(df_components: pd.DataFrame) -> pd.DataFrame:
+    """Aggregate component-level statistics by attack_id."""
+    if "attack_id" not in df_components.columns:
+        raise ValueError("Component data must include attack_id to aggregate features.")
+
+    numeric_cols = [
+        col
+        for col in df_components.columns
+        if col not in ["attack_id", "card", "victim_ip", "attack_code", "time"]
+        and pd.api.types.is_numeric_dtype(df_components[col])
+    ]
+
+    if not numeric_cols:
+        return df_components[["attack_id"]].drop_duplicates().reset_index(drop=True)
+
+    aggregations = {
+        col: ["mean", "sum", "min", "max", "std"] for col in numeric_cols
+    }
+    agg = df_components.groupby("attack_id").agg(aggregations)
+    agg.columns = ["_" .join(filter(None, [col, func])).strip("_") for col, func in agg.columns]
+    agg["component_count"] = df_components.groupby("attack_id").size()
+    agg = agg.reset_index()
+    return agg
+
+
+def _load_csv_files(file_paths):
+    frames = [pd.read_csv(p) for p in file_paths]
+    return pd.concat(frames, ignore_index=True)
+
+
 def load_dataset(data_dir: Path, set_name: str) -> pd.DataFrame:
     """
-    Load a dataset from disk.
+    Load a dataset from disk. Supports event/component data from the SCLDDoS2024 files.
 
     Args:
         data_dir: Path to data directory.
         set_name: Name of set ('a', 'b', 'c', 'd').
 
     Returns:
-        DataFrame with all CSV files in the set directory concatenated.
+        DataFrame with normalized event-level data.
     """
     set_path = data_dir / f"set_{set_name}"
 
     if not set_path.exists():
         raise FileNotFoundError(f"Dataset directory not found: {set_path}")
 
-    csv_files = sorted(set_path.glob("*.csv"))
-    if not csv_files:
-        raise FileNotFoundError(f"No CSV files found in {set_path}")
+    event_files = sorted(set_path.glob(f"*{EVENT_SUFFIX}"))
+    component_files = sorted(set_path.glob(f"*{COMPONENT_SUFFIX}"))
 
-    frames = [pd.read_csv(f) for f in csv_files]
-    return pd.concat(frames, ignore_index=True)
+    if event_files:
+        df_events = _load_csv_files(event_files)
+        df_events = normalize_columns(df_events)
+
+        if component_files:
+            df_components = _load_csv_files(component_files)
+            df_components = normalize_columns(df_components)
+            df_components_agg = _aggregate_component_features(df_components)
+            if "attack_id" in df_events.columns and "attack_id" in df_components_agg.columns:
+                df = df_events.merge(df_components_agg, on="attack_id", how="left")
+            else:
+                df = df_events
+        else:
+            df = df_events
+    else:
+        csv_files = sorted(set_path.glob("*.csv"))
+        if not csv_files:
+            raise FileNotFoundError(f"No CSV files found in {set_path}")
+        df = _load_csv_files(csv_files)
+        df = normalize_columns(df)
+
+    return df
 
 
 def load_multiple_datasets(

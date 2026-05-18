@@ -50,7 +50,7 @@ def engineer_features(df: pd.DataFrame) -> pd.DataFrame:
             pass
 
     # Duration features
-    if "flow_duration" not in df.columns and "start_time" in df.columns and "end_time" in df.columns:
+    if "end_time" in df.columns and "start_time" in df.columns:
         try:
             df["end_time"] = pd.to_datetime(df["end_time"], errors="coerce")
             df["flow_duration"] = (df["end_time"] - df["start_time"]).dt.total_seconds()
@@ -58,11 +58,16 @@ def engineer_features(df: pd.DataFrame) -> pd.DataFrame:
         except Exception:
             pass
 
+    # Remove raw timestamp fields after feature engineering
+    for raw_time_col in ["start_time", "end_time", "time"]:
+        if raw_time_col in df.columns:
+            df.drop(columns=[raw_time_col], inplace=True)
+
     # Packet/data ratio
-    if "packet_speed" in df.columns and "bytes_per_second" in df.columns:
+    if "packet_speed" in df.columns and "data_speed" in df.columns:
         df["packet_data_ratio"] = np.where(
-            df["bytes_per_second"] != 0,
-            df["packet_speed"] / df["bytes_per_second"],
+            df["data_speed"] != 0,
+            df["packet_speed"] / df["data_speed"],
             0,
         )
         features_to_add.append("packet_data_ratio")

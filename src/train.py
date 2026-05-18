@@ -13,15 +13,23 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.utils.class_weight import compute_class_weight
 
-from utils import setup_logging, get_project_paths, load_multiple_datasets, save_config
-from preprocess import engineer_features, preprocess_datasets, save_preprocessor
-from sample_selection import select_diverse_normals
-from evaluate import evaluate_model, save_confusion_matrix, print_metrics_report
+from src.utils import setup_logging, get_project_paths, load_multiple_datasets, save_config
+from src.preprocess import engineer_features, preprocess_datasets, save_preprocessor
+from src.sample_selection import select_diverse_normals
+from src.evaluate import evaluate_model, save_confusion_matrix, print_metrics_report
 
 logger = logging.getLogger("ddos_detection")
 
-# Leakage prevention: columns to drop
-LEAKAGE_COLS = []
+# Leakage prevention: columns to drop before training/inference.
+# The real SCLDDoS2024 schema includes identifiers and internal detector flags,
+# which should not be used as model features.
+LEAKAGE_COLS = [
+    "attack_id",
+    "victim_ip",
+    "card",
+    "significant_flag",
+    "whitelist_flag",
+]
 
 
 def load_training_data(
@@ -135,9 +143,11 @@ def train_and_evaluate(
 
     # Train Random Forest with class weights
     logger.info("Training Random Forest model...")
-    class_labels = sorted(y_train.unique())
-    class_weights = compute_class_weight("balanced", classes=class_labels, y=y_train)
-    class_weight_dict = dict(zip(class_labels, class_weights))
+    # compute_class_weight requires a numpy.ndarray for the `classes` parameter
+    class_labels_arr = np.unique(y_train)
+    class_labels = class_labels_arr.tolist()
+    class_weights = compute_class_weight("balanced", classes=class_labels_arr, y=y_train)
+    class_weight_dict = dict(zip(class_labels, class_weights.tolist()))
 
     model = RandomForestClassifier(
         n_estimators=100,

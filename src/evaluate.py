@@ -14,7 +14,7 @@ from sklearn.metrics import (
     ConfusionMatrixDisplay,
 )
 
-from utils import compute_metrics, compute_per_class_metrics, get_confusion_matrix
+from src.utils import compute_metrics, compute_per_class_metrics, get_confusion_matrix
 
 logger = logging.getLogger("ddos_detection")
 

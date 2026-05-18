@@ -153,7 +153,7 @@ def generate_all_dummy_datasets(output_dir: Path) -> None:
 
 
 if __name__ == "__main__":
-    from utils import setup_logging, get_project_paths
+    from src.utils import setup_logging, get_project_paths
 
     setup_logging()
     paths = get_project_paths()

@@ -53,35 +53,42 @@ ddos-detection/
 
 ## Dataset Structure
 
-### Feature Set
+The pipeline is designed for the SCLDDoS2024 dataset layout with event- and component-level CSV files.
+Each `set_*` folder may contain:
+- `SCLDDoS2024_Set*_events.csv`
+- `SCLDDoS2024_Set*_components.csv`
 
-Each traffic sample contains 10 network features:
+### Event-level Feature Set
+
+The model loads event-level features from the `*_events.csv` files and optionally merges aggregated component statistics from `*_components.csv`.
 
 | Feature | Type | Description |
 |---------|------|-------------|
-| `packet_count` | int | Total packets in flow |
-| `byte_count` | int | Total bytes in flow |
-| `flow_duration` | float | Duration in seconds |
-| `packets_per_second` | float | Packet rate |
-| `bytes_per_second` | float | Byte rate (throughput) |
-| `avg_packet_size` | float | Average packet size in bytes |
-| `syn_flag_count` | int | Count of SYN-flagged packets |
-| `ack_flag_count` | int | Count of ACK-flagged packets |
-| `rst_flag_count` | int | Count of RST-flagged packets |
-| `entropy` | float | Flow entropy [0, 8] |
+| `attack_id` | str | Unique attack event identifier |
+| `card` | str | Network card identifier |
+| `victim_ip` | str | Anonymized target IP |
+| `port_number` | int | Destination port |
+| `attack_code` | str | Attack type/code |
+| `detect_count` | int | Number of detected event components |
+| `significant_flag` | int | Internal detector flag (ignored in modeling) |
+| `packet_speed` | float | Packets per second |
+| `data_speed` | float | Data rate in bits per second |
+| `avg_packet_len` | float | Average packet length in bytes |
+| `avg_source_ip_count` | float | Average number of source IPs |
+| `start_time` | datetime | Event start timestamp |
+| `end_time` | datetime | Event end timestamp |
+| `whitelist_flag` | int | Internal detector flag (ignored in modeling) |
+| `type` | str | Event label/category |
 
 ### Target Variable
 
-**`type`** (binary classification):
-- `normal traffic` → Label 0
-- `DDoS attack` → Label 1
+**`type`** is used as the model label. The implementation supports the real dataset label names, including `normal traffic` and attack categories.
 
 ### Data Distribution
 
-- **Set A, B, C** (Training): ~1000 samples each, 70% normal / 30% DDoS
-- **Set D** (Holdout test): ~800 samples, 50% normal / 50% DDoS
-  - Intentionally harder distribution (higher DDoS prevalence)
-  - Simulates domain shift in deployment
+- **Set A, B, C** → Training data
+- **Set D** → Holdout evaluation / generalization data
+  - Set D is intended for genericity testing and may contain distribution shifts compared to A/B/C
 
 ---
 
